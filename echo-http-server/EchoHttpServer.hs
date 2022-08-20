@@ -1,5 +1,6 @@
 module EchoHttpServer
   ( start,
+    testWith,
   )
 where
 
@@ -20,6 +21,12 @@ start port = do
           & Warp.setPort port
   forkIO $ Warp.runSettings settings app
   readMVar gate
+
+-- | Start a server on a free port and run the provided continuation on it.
+-- After the continuation is done the server is stopped.
+testWith :: (Int -> IO a) -> IO a
+testWith =
+  Warp.testWithApplication (pure app)
 
 app :: Wai.Application
 app request respond = do
