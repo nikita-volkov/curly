@@ -57,6 +57,7 @@ test-suite test
   main-is: Main.hs
   build-depends:
     curly,
+    echo-http-server,
     QuickCheck >=2.8.1 && <3,
     quickcheck-instances >=0.3.11 && <0.4,
     rerebase <2,
