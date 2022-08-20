@@ -38,6 +38,18 @@ library
     text >=1 && <2,
     transformers >=0.5 && <0.6,
 
+library echo-http-server
+  import: base-settings
+  hs-source-dirs: echo-http-server
+  exposed-modules:
+    EchoHttpServer
+  build-depends:
+    http-media >=0.8 && <0.9,
+    http-types >=0.12 && <0.13,
+    wai >=3.2 && <3.3,
+    warp >=3.3 && <3.4,
+    rerebase >=1.15.0.3 && <1.16,
+
 test-suite test
   import: base-settings
   type: exitcode-stdio-1.0
