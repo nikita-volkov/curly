@@ -1,8 +1,15 @@
 module Curly
-  ( runOpHappily,
+  ( -- * Execution
+    runOpHappily,
 
     -- * Op
     Op,
+    post,
+
+    -- * BodyParser
+    BodyParser,
+    explicitCerealBodyParser,
+    implicitCerealBodyParser,
   )
 where
 
@@ -20,8 +27,8 @@ runOp (Op runOp) = do
   return res
 
 runOpHappily :: Op a -> IO a
-runOpHappily =
-  error "TODO"
+runOpHappily op =
+  runOp op >>= either (fail . show) return
 
 -- * Op
 
@@ -31,6 +38,7 @@ newtype Op a
 data OpErr
   = CurlOpErr Curl.CURLE
   | BodyParserOpErr Text
+  deriving (Show)
 
 post ::
   -- | URL.
