@@ -53,12 +53,14 @@ data OpErr
 post ::
   -- | URL.
   String ->
+  -- | Request headers.
+  [(Text, Text)] ->
   -- | Request body.
   ByteString ->
   -- | Response body parser.
   BodyParser body ->
   Op body
-post url body (BodyParser setBodyParserUp) =
+post url headers body (BodyParser setBodyParserUp) =
   Op $ \curl -> runExceptT $ do
     lift $ CurlhsExtras.setByteStringReadFunction curl body
     lift $
@@ -66,6 +68,7 @@ post url body (BodyParser setBodyParserUp) =
         curl
         [ Curl.CURLOPT_URL url,
           Curl.CURLOPT_POST True,
+          Curl.CURLOPT_HTTPHEADER (prepareHeaders headers),
           Curl.CURLOPT_POSTFIELDSIZE_LARGE (fromIntegral . ByteString.length $ body)
         ]
     awaitBody <- lift $ setBodyParserUp curl
@@ -118,3 +121,10 @@ explicitCerealBodyParser get =
 
 implicitCerealBodyParser :: Cereal.Serialize a => BodyParser a
 implicitCerealBodyParser = explicitCerealBodyParser Cereal.get
+
+-- * Helpers
+
+prepareHeaders = fmap prepareHeader
+
+prepareHeader (name, value) =
+  toString name <> ": " <> toString value

@@ -15,6 +15,6 @@ main =
           response <-
             let url = "http://127.0.0.1:" <> show port
                 body = Cereal.encode value
-             in Curly.runOpHappily $ Curly.post url body Curly.implicitCerealBodyParser
+             in Curly.runOpHappily $ Curly.post url [] body Curly.implicitCerealBodyParser
           return $ value === response
     ]
