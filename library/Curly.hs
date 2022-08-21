@@ -30,7 +30,7 @@ runOp timeout (Op runOp) = do
     curl
     [ Curl.CURLOPT_FOLLOWLOCATION True,
       Curl.CURLOPT_NOPROGRESS True,
-      Curl.CURLOPT_VERBOSE False,
+      Curl.CURLOPT_VERBOSE True,
       Curl.CURLOPT_TIMEOUT (fromIntegral timeout)
     ]
   res <- runOp curl
