@@ -25,7 +25,8 @@ runOp (Op runOp) = do
   Curl.curl_easy_setopt
     curl
     [ Curl.CURLOPT_FOLLOWLOCATION True,
-      Curl.CURLOPT_NOPROGRESS True
+      Curl.CURLOPT_NOPROGRESS True,
+      Curl.CURLOPT_VERBOSE False
     ]
   res <- runOp curl
   Curl.curl_easy_cleanup curl
@@ -75,7 +76,41 @@ newtype BodyParser a
 explicitCerealBodyParser :: Cereal.Get a -> BodyParser a
 explicitCerealBodyParser get =
   BodyParser $ \curl -> do
-    CurlhsExtras.setAwatingCerealWriteFunction curl get
+    consumeVar <- newIORef $ Cereal.runGetPartial get
+    earlyResVar <- newIORef Nothing
+    Curl.curl_easy_setopt
+      curl
+      [ Curl.CURLOPT_WRITEFUNCTION . Just $ \input -> do
+          consume <- readIORef consumeVar
+          case consume input of
+            Cereal.Partial consume -> do
+              writeIORef consumeVar consume
+              return Curl.CURL_WRITEFUNC_OK
+            Cereal.Done res remainder -> do
+              if ByteString.null remainder
+                then do
+                  writeIORef earlyResVar $ Just $ Right res
+                  return Curl.CURL_WRITEFUNC_OK
+                else do
+                  writeIORef earlyResVar $ Just $ Left "Not all data consumed"
+                  return Curl.CURL_WRITEFUNC_FAIL
+            Cereal.Fail err remainder -> do
+              writeIORef earlyResVar $ Just $ Left err
+              return Curl.CURL_WRITEFUNC_FAIL
+      ]
+    return $ do
+      earlyRes <- readIORef earlyResVar
+      case earlyRes of
+        Just earlyRes -> return $ earlyRes
+        Nothing -> do
+          consume <- readIORef consumeVar
+          return $ case consume mempty of
+            Cereal.Partial consume -> Left "Not enough input"
+            Cereal.Done res remainder ->
+              if ByteString.null remainder
+                then Right res
+                else Left "Not all data consumed"
+            Cereal.Fail err remainder -> Left err
 
 implicitCerealBodyParser :: Cereal.Serialize a => BodyParser a
 implicitCerealBodyParser = explicitCerealBodyParser Cereal.get

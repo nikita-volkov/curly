@@ -16,11 +16,5 @@ main =
             let url = "http://127.0.0.1:" <> show port
                 body = Cereal.encode value
              in Curly.runOpHappily $ Curly.post url body Curly.implicitCerealBodyParser
-          return $ value === response,
-      testProperty "httpbin.org/post" $ \(value :: String) -> unsafePerformIO $ do
-        response <-
-          let body = Cereal.encode value
-              url = "https://httpbin.org/post"
-           in Curly.runOpHappily $ Curly.post url body Curly.implicitCerealBodyParser
-        return $ value === response
+          return $ value === response
     ]
