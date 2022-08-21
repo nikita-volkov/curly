@@ -19,22 +19,31 @@ import qualified Data.ByteString as ByteString
 import qualified Data.Serialize as Cereal
 import qualified Network.CURL730 as Curl
 
-runOp :: Op a -> IO (Either OpErr a)
-runOp (Op runOp) = do
+runOp ::
+  -- | Timeout in seconds.
+  Int ->
+  Op a ->
+  IO (Either OpErr a)
+runOp timeout (Op runOp) = do
   curl <- Curl.curl_easy_init
   Curl.curl_easy_setopt
     curl
     [ Curl.CURLOPT_FOLLOWLOCATION True,
       Curl.CURLOPT_NOPROGRESS True,
-      Curl.CURLOPT_VERBOSE False
+      Curl.CURLOPT_VERBOSE False,
+      Curl.CURLOPT_TIMEOUT (fromIntegral timeout)
     ]
   res <- runOp curl
   Curl.curl_easy_cleanup curl
   return res
 
-runOpHappily :: Op a -> IO a
-runOpHappily op =
-  runOp op >>= either (die . renderErr) return
+runOpHappily ::
+  -- | Timeout in seconds.
+  Int ->
+  Op a ->
+  IO a
+runOpHappily timeout op =
+  runOp timeout op >>= either (die . renderErr) return
   where
     renderErr = \case
       CurlOpErr err -> "Curl: " <> show err
