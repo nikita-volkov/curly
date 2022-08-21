@@ -44,6 +44,9 @@ runOpHappily op =
 
 newtype Op a
   = Op (Curl.CURL -> IO (Either OpErr a))
+  deriving
+    (Functor, Applicative, Monad)
+    via (ReaderT Curl.CURL (ExceptT OpErr IO))
 
 data OpErr
   = CurlOpErr Curl.CURLE
