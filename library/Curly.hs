@@ -34,7 +34,11 @@ runOp (Op runOp) = do
 
 runOpHappily :: Op a -> IO a
 runOpHappily op =
-  runOp op >>= either (fail . show) return
+  runOp op >>= either (die . renderErr) return
+  where
+    renderErr = \case
+      CurlOpErr err -> "Curl: " <> show err
+      BodyParserOpErr err -> "Body parser: " <> toString err
 
 -- * Op
 
