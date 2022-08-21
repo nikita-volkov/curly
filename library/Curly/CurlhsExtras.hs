@@ -5,22 +5,14 @@ import qualified Data.ByteString as ByteString
 import qualified Data.Serialize as Cereal
 import Network.CURL730
 
--- | Recursively updates the read function until the whole bytestring is consumed.
 setByteStringReadFunction :: CURL -> ByteString -> IO ()
-setByteStringReadFunction handle input =
-  if ByteString.null input
-    then
-      curl_easy_setopt handle $
-        [ CURLOPT_READFUNCTION Nothing
-        ]
-    else
-      curl_easy_setopt handle $
-        [ CURLOPT_READFUNCTION . Just $ \requestedAmount ->
-            case ByteString.splitAt requestedAmount input of
-              (toSend, remainder) -> do
-                setByteStringReadFunction handle remainder
-                return $ CURL_READFUNC_OK toSend
-        ]
+setByteStringReadFunction handle input = do
+  var <- newIORef input
+  curl_easy_setopt handle $
+    [ CURLOPT_READFUNCTION . Just $ \requestedAmount ->
+        atomicModifyIORef' var $
+          fmap CURL_READFUNC_OK . swap . ByteString.splitAt requestedAmount
+    ]
 
 setAwatingCerealWriteFunction :: CURL -> Cereal.Get res -> IO (IO (Either String res))
 setAwatingCerealWriteFunction handle get = do
@@ -38,24 +30,24 @@ setBasicCerealWriteFunction ::
   (res -> IO ()) ->
   (ByteString -> Cereal.Result res) ->
   IO ()
-setBasicCerealWriteFunction handle fail emit consume =
+setBasicCerealWriteFunction handle reportError emit consume = do
+  var <- newIORef consume
   curl_easy_setopt handle $
-    [ CURLOPT_WRITEFUNCTION . Just $ \input ->
+    [ CURLOPT_WRITEFUNCTION . Just $ \input -> do
+        consume <- readIORef var
         case consume input of
           Cereal.Partial consume -> do
-            setBasicCerealWriteFunction handle fail emit consume
+            writeIORef var consume
             return CURL_WRITEFUNC_OK
           Cereal.Done res remainder -> do
-            curl_easy_setopt handle [CURLOPT_WRITEFUNCTION Nothing]
             if ByteString.null remainder
               then do
-                fail "Not all data consumed"
-                return CURL_WRITEFUNC_FAIL
-              else do
                 emit res
                 return CURL_WRITEFUNC_OK
+              else do
+                reportError "Not all data consumed"
+                return CURL_WRITEFUNC_FAIL
           Cereal.Fail err remainder -> do
-            curl_easy_setopt handle [CURLOPT_WRITEFUNCTION Nothing]
-            fail err
+            reportError err
             return CURL_WRITEFUNC_FAIL
     ]

@@ -15,13 +15,18 @@ where
 
 import qualified Curly.CurlhsExtras as CurlhsExtras
 import Curly.Prelude hiding (Handle, Op, Version)
+import qualified Data.ByteString as ByteString
 import qualified Data.Serialize as Cereal
 import qualified Network.CURL730 as Curl
 
 runOp :: Op a -> IO (Either OpErr a)
 runOp (Op runOp) = do
   curl <- Curl.curl_easy_init
-  Curl.curl_easy_setopt curl [Curl.CURLOPT_FOLLOWLOCATION True]
+  Curl.curl_easy_setopt
+    curl
+    [ Curl.CURLOPT_FOLLOWLOCATION True,
+      Curl.CURLOPT_NOPROGRESS True
+    ]
   res <- runOp curl
   Curl.curl_easy_cleanup curl
   return res
@@ -50,11 +55,17 @@ post ::
   Op body
 post url body (BodyParser setBodyParserUp) =
   Op $ \curl -> runExceptT $ do
-    lift $ Curl.curl_easy_setopt curl [Curl.CURLOPT_URL url, Curl.CURLOPT_POST True]
     lift $ CurlhsExtras.setByteStringReadFunction curl body
-    readBodyResult <- lift $ setBodyParserUp curl
+    lift $
+      Curl.curl_easy_setopt
+        curl
+        [ Curl.CURLOPT_URL url,
+          Curl.CURLOPT_POST True,
+          Curl.CURLOPT_POSTFIELDSIZE_LARGE (fromIntegral . ByteString.length $ body)
+        ]
+    awaitBody <- lift $ setBodyParserUp curl
     ExceptT $ catch (Right <$> Curl.curl_easy_perform curl) (return . Left . CurlOpErr)
-    ExceptT $ first (BodyParserOpErr . fromString) <$> readBodyResult
+    ExceptT $ first (BodyParserOpErr . fromString) <$> awaitBody
 
 -- * BodyParser
 

@@ -53,6 +53,10 @@ library echo-http-server
 test-suite test
   import: base-settings
   type: exitcode-stdio-1.0
+  ghc-options:
+    -O2
+    -threaded
+    "-with-rtsopts=-N -I0 -qg"
   hs-source-dirs: test
   main-is: Main.hs
   build-depends:
