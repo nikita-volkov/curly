@@ -97,9 +97,7 @@ explicitCerealBodyParser get =
   BodyParser $ \curl -> do
     consumeVar <- newIORef $ Cereal.runGetPartial get
     earlyResVar <- newIORef Nothing
-    Curl.curl_easy_setopt
-      curl
-      [ Curl.CURLOPT_WRITEFUNCTION . Just $ \input -> do
+    let writeFunction input = do
           consume <- readIORef consumeVar
           case consume input of
             Cereal.Partial consume -> do
@@ -116,20 +114,22 @@ explicitCerealBodyParser get =
             Cereal.Fail err remainder -> do
               writeIORef earlyResVar $ Just $ Left err
               return Curl.CURL_WRITEFUNC_FAIL
-      ]
-    return $ do
-      earlyRes <- readIORef earlyResVar
-      case earlyRes of
-        Just earlyRes -> return $ earlyRes
-        Nothing -> do
-          consume <- readIORef consumeVar
-          return $ case consume mempty of
-            Cereal.Partial consume -> Left "Not enough input"
-            Cereal.Done res remainder ->
-              if ByteString.null remainder
-                then Right res
-                else Left "Not all data consumed"
-            Cereal.Fail err remainder -> Left err
+        extractor = do
+          earlyRes <- readIORef earlyResVar
+          case earlyRes of
+            Just earlyRes -> return $ earlyRes
+            Nothing -> do
+              consume <- readIORef consumeVar
+              return $ case consume mempty of
+                Cereal.Partial consume -> Left "Not enough input"
+                Cereal.Done res remainder ->
+                  if ByteString.null remainder
+                    then Right res
+                    else Left "Not all data consumed"
+                Cereal.Fail err remainder -> Left err
+     in do
+          Curl.curl_easy_setopt curl [Curl.CURLOPT_WRITEFUNCTION (Just writeFunction)]
+          return extractor
 
 implicitCerealBodyParser :: Cereal.Serialize a => BodyParser a
 implicitCerealBodyParser = explicitCerealBodyParser Cereal.get
